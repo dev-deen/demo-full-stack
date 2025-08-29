@@ -12,8 +12,13 @@ import json
 # Create your views here.
 class ProductViewSet(viewsets.ModelViewSet):
 
+
+
     BASE_DEMAND = 500
 
+    serializer_class = ProductSerializer
+    queryset = Product.objects.all()
+    
     def list(self, request):
 
         queryset = Product.objects.all()
