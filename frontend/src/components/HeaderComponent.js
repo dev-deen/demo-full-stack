@@ -1,210 +1,169 @@
 import { useEffect, useState, useRef } from "react";
 import api from "../api/axios";
-import "../styles/headerstyle.css"; 
-import {useNavigate} from 'react-router-dom';
-import AddProductComponent from './AddProductComponent';
+import "../styles/headerstyle.css";
+import { useNavigate } from "react-router-dom";
+import AddProductComponent from "./AddProductComponent"
 import DemandForecastChart from "./DemandForecastChart";
 
-export default function HeaderComponent(
-    {
-     isProductPage, 
-     products,
-     setProducts,
-     demandForecast,
-     setDemandForecast,
-     setModalContent,
-     setComponentProps,
-     productsDataForDemandChart 
-    }) {
+export default function HeaderComponent({
+  isProductPage,
+  products,
+  setProducts,
+  demandForecast,
+  setDemandForecast,
+  setModalContent,
+  setComponentProps,
+  productsForDemandChart
+}) {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [error, setError] = useState("");
   const debounceRef = useRef(null);
 
-
   const navigate = useNavigate();
 
-  // product api request
   const fetchProduct = async () => {
     try {
       const response = await api.get("products", {
-        params: {
-          search: searchKeyword,
-          category: categoryFilter,
-        },
+        params: { search: searchKeyword, category: categoryFilter },
       });
-
-      const transformedProducts = response.data.map((product) => ({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        costPrice: parseFloat(product.cost_price),
-        sellingPrice: parseFloat(product.selling_price),
-        description: product.description,
-        availableStocks: product.stock_available,
-        unitsSold: product.units_sold,
+      const transformed = response.data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        costPrice: parseFloat(p.cost_price),
+        sellingPrice: parseFloat(p.selling_price),
+        description: p.description,
+        availableStocks: p.stock_available,
+        unitsSold: p.units_sold,
       }));
-
-      setProducts(transformedProducts);
-    } catch (error) {
-      setError("Something went wrong while Searching");
+      setProducts(transformed);
+    } catch {
+      setError("Something went wrong while searching");
     }
   };
 
-  //handle back
-  const handleBack = () =>{
-    if(window.history.length > 1){
-        navigate(-1);
-    }else{
-        navigate("/")
-    }
-  }
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/");
+  };
 
-  // category api request
   const fetchCategory = async () => {
     try {
-      const response = await api.get("products/get_all_categories");
-      setCategoryOptions(response.data.categories);
-    } catch (error) {
-      console.log(error);
-      setError("Categories fetch Error");
+      const res = await api.get("products/get_all_categories");
+      setCategoryOptions(res.data.categories);
+    } catch (err) {
+      console.error(err);
+      setError("Category fetch error");
     }
   };
 
-  // search function with debouncing
   const handleSearch = (e) => {
     setSearchKeyword(e.target.value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchProduct();
-    }, 500);
+    debounceRef.current = setTimeout(() => fetchProduct(), 500);
   };
 
-  // category filter
-  const handleCategoryFilter = (e) => {
-    setCategoryFilter(e.target.value);
-  };
+  const handleCategoryFilter = (e) => setCategoryFilter(e.target.value);
 
-  // filter submit
   const handleFilterSubmit = (e) => {
     e.preventDefault();
     fetchProduct();
   };
 
-  // add product page assigned to Modal
   const handleAddProduct = () => {
-    setModalContent(AddProductComponent);
-  };
-
-  const getDemandForecastData = () =>{
-    const selectedProducts = products.filter((product)=>productsDataForDemandChart.includes(product.id))
-    const chartData = Promise.all(selectedProducts.map(async(product)=>{
-      try{
-        const response = await api.get(`products/${product.id}/get_forecast`);
-        return {
-          ...product,
-          data: response.data.demand_forecast
-        }
-      }catch(error){
-        console.log("headerComponent: " + error);
-        return {
-          product, 
-          data: []
-        }
-      }
-    }));
-    return chartData;
+    setModalContent(<AddProductComponent/>);
   }
 
-  //filtered data passed to chart which will be presented in modal
-  const handleDemandForecast = () => {
+  const getDemandForecastData = async () => {
+    const selected = products.filter((p) =>
+      productsForDemandChart.includes(p.id)
+    );
+    console.log("selected: ", selected)
+    return Promise.all(
+      selected.map(async (product) => {
+        try {
+          const res = await api.get(`products/${product.id}/get_forecast`);
+          console.log("res: ", res.data);
+          return { ...product, data: res.data.demand_forecast };
+        } catch (err) {
+          console.error(err);
+          return { ...product, data: [] };
+        }
+      })
+    );
+  };
+
+  const handleDemandForecast = async () => {
+    console.log(productsForDemandChart)
+    if(!productsForDemandChart || productsForDemandChart.length===0){
+      alert("Please select some product for demand chart")
+      return;
+    }
+    const chartData = await getDemandForecastData();
+    console.log("charDat:", chartData);
+    setComponentProps({ data: chartData });
     setModalContent(DemandForecastChart);
-    const chartData = Promise.all(selectedProducts.map(async(product)=>{
-      try{
-        const response = await api.get(`products/${product.id}/get_forecast`);
-        return {
-          ...product,
-          data: response.data.demand_forecast
-        }
-      }catch(error){
-        console.log("headerComponent: " + error);
-        return {
-          product, 
-          data: []
-        }
-      }
-    }));
-    
-    setComponentProps({
-      
-    })
   };
 
   useEffect(() => {
     fetchCategory();
   }, []);
 
+
   return (
     <div className="header-container">
-
-        <div className="header-left">
-            <div className="header-back"
-            onClick={handleBack}
-            >Back
-            </div>
-            <div className="header-title">
-            {isProductPage ? "Create and Manage Product" : "Prize Optimization"}
-            </div>
-            {isProductPage && (
-            <div className="header-switch">
-                <input 
-                type="checkbox" 
-                name="demandSwitch" 
-                checked={demandForecast}
-                onChange={()=>setDemandForecast((prev)=>!prev)}/>
-                <label htmlFor="demandSwitch">With Demand Forecast</label>
-            </div>
-            )}
+      <div className="header-left">
+        <div className="header-back" onClick={handleBack}>Back</div>
+        <div className="header-title">
+          {isProductPage ? "Create and Manage Product" : "Price Optimization"}
         </div>
-
-
-        <div className="header-right">
-            <div className="header-search">
+        {isProductPage && (
+          <div className="header-switch">
             <input
-                type="search"
-                placeholder="Search"
-                value={searchKeyword}
-                onChange={handleSearch}
+              type="checkbox"
+              name="demandSwitch"
+              checked={demandForecast}
+              onChange={() => setDemandForecast((prev) => !prev)}
             />
-            </div>
-
-            <form className="header-search" onSubmit={handleFilterSubmit}>
-            <label className="header-label">Category: </label>
-            <select
-                className="header-category"
-                value={categoryFilter}
-                onChange={handleCategoryFilter}
-            >
-                <option value="">All</option>
-                {categoryOptions?.map((cat, i) => (
-                <option key={i} value={cat}>
-                    {cat}
-                </option>
-                ))}
-            </select>
-
-            <button type="submit" className="header-filter">
-                Filter
-            </button>
-            </form>
-
-            <div className="header-actions">
-            <button onClick={handleAddProduct}>Add Product</button>
-            <button onClick={handleDemandForecast}>Demand Forecast</button>
-            </div>
-        </div>
+            <label htmlFor="demandSwitch">With Demand Forecast</label>
+          </div>
+        )}
       </div>
 
+      <div className="header-right">
+        <div className="header-search">
+          <input
+            type="search"
+            placeholder="Search"
+            value={searchKeyword}
+            onChange={handleSearch}
+          />
+        </div>
+
+        <form className="header-search" onSubmit={handleFilterSubmit}>
+          <label className="header-label">Category: </label>
+          <select
+            className="header-category"
+            value={categoryFilter}
+            onChange={handleCategoryFilter}
+          >
+            <option value="">All</option>
+            {categoryOptions.map((cat, i) => (
+              <option key={i} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="header-filter">Filter</button>
+        </form>
+
+        <div className="header-actions">
+          <button onClick={handleAddProduct}>Add Product</button>
+          <button onClick={handleDemandForecast}>Demand Forecast</button>
+        </div>
+      </div>
+    </div>
   );
 }

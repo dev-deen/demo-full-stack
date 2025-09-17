@@ -1,5 +1,5 @@
 import React from "react";
-import "./Modal.css"; 
+import "../styles/ModalStyle.css"; 
 
 export default function Modal({ isOpen, onClose, Component, componentProps }) {
   if (!isOpen) return null;
@@ -13,7 +13,7 @@ export default function Modal({ isOpen, onClose, Component, componentProps }) {
         <button className="modal-close" onClick={onClose}>
           ✖
         </button>
-        {Component && <Component {...componentProps} />}
+        {Component}
       </div>
     </div>
   );
